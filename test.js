@@ -67,6 +67,7 @@ function init() {
         keys.push(new Key(i));
     }
     $.each([true, false], function(i, mode) {
+            // draw white keys first, then black
             $.each(keys, function(i, e) {
                     console.log(e, mode);
                     if (e.white() == mode) {
