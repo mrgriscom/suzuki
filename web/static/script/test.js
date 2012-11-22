@@ -75,16 +75,51 @@ function init_keyboard() {
                     }
                 });
         });
+
+
+    var conn = new WebSocket('ws://localhost:8000/socket');
+    conn.onopen = function () {
+        console.log('opened');
+        setInterval(function() {
+                conn.send('Ping ' + new Date()); // Send the message 'Ping' to the server
+            }, 1000);
+    };
+
+// Log errors
+    conn.onerror = function (error) {
+        console.log('WebSocket Error ' + error);
+    };
+
+// Log messages from the server
+    conn.onmessage = function (e) {
+        console.log('Server: ' + e.data);
+    };
 }
 
 function init_pianoroll() {
     var paper = Raphael($('#canvas')[0]);
-    var NOTE_SZ = 5;
-    var BEAT_SZ = 25;
+
+    var MODE = 'horiz';
+    //var MODE = 'vert';
+
     $.get('/pianoroll', function(data) {
             $.each(data, function(k, v) {
                     $.each(v, function(i, e) {
-                            paper.rect(e.beat * BEAT_SZ, (127 - e.note) * NOTE_SZ, e.duration * BEAT_SZ, NOTE_SZ);
+                            var r;
+                            if (MODE == 'horiz') {
+                                var NOTE_SZ = 5;
+                                var BEAT_SZ = 25;
+                                r = paper.rect(e.beat * BEAT_SZ, (127 - e.note) * NOTE_SZ, e.duration * BEAT_SZ, NOTE_SZ);
+                            } else {
+                                var BEAT_SZ = 200;
+                                var y = function(b) {
+                                    return 950 - BEAT_SZ * (Math.log(b + 1) - Math.log(1.));
+                                }
+
+                                var NOTE_SZ = 1500 / 88.;
+                                r = paper.rect((e.note - 9) * NOTE_SZ, y(e.beat + e.duration), NOTE_SZ, y(e.beat) - y(e.beat + e.duration));
+                            }
+                            r.attr({fill: '#ccf'});
                         });
                 });
         });

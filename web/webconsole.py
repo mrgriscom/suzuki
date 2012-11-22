@@ -8,6 +8,7 @@ from tornado.ioloop import IOLoop
 import tornado.web as web
 import tornado.gen as gen
 from tornado.template import Template
+import tornado.websocket as websocket
 from optparse import OptionParser
 import logging
 import json
@@ -32,6 +33,26 @@ class PianoRollPlaygroundHandler(web.RequestHandler):
     def get(self):
         self.render('test.html', onload='init_pianoroll')
 
+class WebSocketTestHandler(websocket.WebSocketHandler):
+    def open(self):
+        print "WebSocket opened"
+
+        import threading
+        def run():
+            import time
+            from datetime import datetime
+            while True:
+                time.sleep(1.)
+                self.write_message('server ' + str(datetime.now()))
+        threading.Thread(target=run).start()
+
+    def on_message(self, message):
+        print 'received', message
+        #self.write_message(u"You said: " + message)
+
+    def on_close(self):
+        print "WebSocket closed"
+
 if __name__ == "__main__":
 
     parser = OptionParser()
@@ -48,6 +69,7 @@ if __name__ == "__main__":
         (r'/', MainHandler),
         (r'/pr', PianoRollPlaygroundHandler),
         (r'/pianoroll', PianoRollHandler),
+        (r'/socket', WebSocketTestHandler),
         (r'/(.*)', web.StaticFileHandler, {'path': web_path('static')}),
     ], template_path=web_path('templates'))
     application.listen(port, ssl_options=ssl)
