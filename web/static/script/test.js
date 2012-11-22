@@ -53,7 +53,7 @@ function Key(i) {
     }
 }
 
-function init() {
+function init_keyboard() {
     var paper = Raphael($('#canvas')[0]);
 
     var WIDTH_W = 30;
@@ -75,9 +75,19 @@ function init() {
                     }
                 });
         });
-
-
 }
 
+function init_pianoroll() {
+    var paper = Raphael($('#canvas')[0]);
+    var NOTE_SZ = 5;
+    var BEAT_SZ = 25;
+    $.get('/pianoroll', function(data) {
+            $.each(data, function(k, v) {
+                    $.each(v, function(i, e) {
+                            paper.rect(e.beat * BEAT_SZ, (127 - e.note) * NOTE_SZ, e.duration * BEAT_SZ, NOTE_SZ);
+                        });
+                });
+        });
+}
 
 
