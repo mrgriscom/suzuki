@@ -89,3 +89,17 @@ if __name__ == "__main__":
     print result
     print len(result)
     print [(k, len(v)) for k, v in result.iteritems()]
+
+    import Image, ImageDraw
+    W, H = 12000, 1500
+    img = Image.new('RGB', (W, H))
+
+    def _(x, y):
+        return (20 * x, H - 10 * y)
+
+    draw = ImageDraw.Draw(img)
+    for note, notes in result.iteritems():
+        for n in notes:
+            draw.rectangle((_(n['beat'], note), _(n['beat'] + n['duration'], note + 1)), '#fff')
+
+    img.save('/tmp/pianoroll.png', "PNG")
