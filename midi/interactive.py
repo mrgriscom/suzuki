@@ -8,9 +8,9 @@ class MIDIDevice(threading.Thread):
     def __init__(self, interface_name):
         threading.Thread.__init__(self)
 
-        device_ids = get_devices(interface_name)
-        self.input = midi.Input(device_ids['input'])
-        self.output = midi.Output(device_ids['output'])
+        input_id, output_id = get_devices(interface_name)
+        self.input = midi.Input(input_id)
+        self.output = midi.Output(output_id)
         self.subscribers = []
 
         self.lock = threading.Lock()
@@ -33,12 +33,12 @@ class MIDIDevice(threading.Thread):
                 sub.received(msg)
 
     def run(self):
-        events = []
         while self.up:
             buf = self.input.read(1000)
-            if buf:
-                events = [parse_event(e) for e in buf]
-                self.broadcast([e for e in events if e])
+            events = [parse_event(e) for e in buf]
+            events = [e for e in events if e]
+            if events:
+                self.broadcast(events)
             time.sleep(0.01)
 
         self.input.close()
@@ -57,12 +57,12 @@ def parse_event(raw):
     return {'state': state, 'note': note}
 
 def get_devices(name):
-    ids = {'input': None, 'output': None}
+    id_in, id_out = None, None
     for i in range(midi.get_count()):
-        device = midi.get_device_info(i)
-        if device[1] == name:
-            if device[2]:
-                ids['input'] = i
-            elif device[3]:
-                ids['output'] = i
-    return ids
+        info = midi.get_device_info(i)
+        if info[1] == name:
+            if info[2]:
+                id_in = i
+            elif info[3]:
+                id_out = i
+    return id_in, id_out
