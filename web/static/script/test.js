@@ -1,7 +1,7 @@
 
 var SCALE_OFFSET = [0, 0.5, 1, 1.5, 2, 3, 3.5, 4, 4.5, 5, 5.5, 6];
 var SCALE_LEN = Math.ceil(SCALE_OFFSET[SCALE_OFFSET.length - 1] + .5);
-var KEY0 = 9; // A
+var KEY0 = 21; // A
 var FREQ0 = 440. / Math.pow(2., 4.); // 4 octaves below A440
 var WIDTH_W = 30;
 
@@ -21,7 +21,8 @@ function Key(i) {
     }
 
     this.center = function() {
-        return SCALE_LEN * Math.floor(this.key() / SCALE_OFFSET.length) + this.offset() - SCALE_OFFSET[KEY0];
+        return SCALE_LEN * Math.floor(this.key() / SCALE_OFFSET.length) + this.offset() -
+        (SCALE_LEN + SCALE_OFFSET[KEY0 % SCALE_OFFSET.length]); // clean this up
     }
 
     this.dim = function() {
@@ -39,16 +40,20 @@ function Key(i) {
         return FREQ0 * Math.pow(2., this.i / SCALE_OFFSET.length)
     }
 
+    this.set_status = function(active) {
+        this.svg.attr({fill: active ? 'orange' : this.default_color()});
+    }
+
     this.init_svg = function(ctx) {
         var dim = this.dim();
         this.svg = ctx.rect(100 + this.center() * WIDTH_W - .5 * dim.width, 100, dim.width, dim.height)
         this.svg.attr({fill: this.default_color()});
         var key = this;
         this.svg.hover(function() {
-                key.svg.attr({fill: 'orange'});
+                key.set_status(true);
             },
             function() {
-                key.svg.attr({fill: key.default_color()});
+                key.set_status(false);
             });
     }
 }
@@ -80,9 +85,6 @@ function init_keyboard() {
     var conn = new WebSocket('ws://localhost:8000/socket');
     conn.onopen = function () {
         console.log('opened');
-        setInterval(function() {
-                conn.send('Ping ' + new Date()); // Send the message 'Ping' to the server
-            }, 1000);
     };
 
 // Log errors
@@ -92,7 +94,10 @@ function init_keyboard() {
 
 // Log messages from the server
     conn.onmessage = function (e) {
-        console.log('Server: ' + e.data);
+        var data = JSON.parse(e.data);
+        console.log(data);
+        var key = keys[data.note - KEY0];
+        key.set_status(data.state == 'on');
     };
 }
 
