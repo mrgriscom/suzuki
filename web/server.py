@@ -37,26 +37,18 @@ class PianoRollPlaygroundHandler(web.RequestHandler):
 class WebSocketTestHandler(websocket.WebSocketHandler):
     def initialize(self, midi):
         self.midi = midi
-        self.terminate = False
 
     def open(self):
-        print "WebSocket opened"
-
-        import threading
-        def run():
-            while not self.terminate:
-                evt = self.midi.next_event()
-                print 'new event2', evt
-                self.write_message(evt)
-        threading.Thread(target=run).start()
+        self.midi.subscribe(self)
 
     def on_message(self, message):
         print 'received', message
-        #self.write_message(u"You said: " + message)
 
     def on_close(self):
-        self.terminate = True
-        print "WebSocket closed"
+        self.midi.unsubscribe(self)
+
+    def received(self, data):
+        self.write_message(data)
 
 if __name__ == "__main__":
 
@@ -70,14 +62,14 @@ if __name__ == "__main__":
         port = 8000
     ssl = None
 
-    m = interactive.MIDI(3)
-    m.start()
+    device = interactive.MIDIDevice('RD MIDI 1')
+    device.start()
 
     application = web.Application([
         (r'/', MainHandler),
         (r'/pr', PianoRollPlaygroundHandler),
         (r'/pianoroll', PianoRollHandler),
-        (r'/socket', WebSocketTestHandler, {'midi': m}),
+        (r'/socket', WebSocketTestHandler, {'midi': device}),
         (r'/(.*)', web.StaticFileHandler, {'path': web_path('static')}),
     ], template_path=web_path('templates'))
     application.listen(port, ssl_options=ssl)
@@ -90,4 +82,5 @@ if __name__ == "__main__":
         print e
         raise
 
+    device.terminate()
     logging.info('shutting down...')
