@@ -1,5 +1,6 @@
 from pygame import midi
 import threading
+import time
 
 midi.init()
 
@@ -32,12 +33,13 @@ class MIDIDevice(threading.Thread):
                 sub.received(msg)
 
     def run(self):
+        events = []
         while self.up:
-            buf = self.input.read(1)
+            buf = self.input.read(1000)
             if buf:
-                evt = parse_event(buf[0])
-                if evt:
-                    self.broadcast(evt)
+                events = [parse_event(e) for e in buf]
+                self.broadcast([e for e in events if e])
+            time.sleep(0.01)
 
         self.input.close()
         self.output.close()

@@ -96,8 +96,10 @@ function init_keyboard() {
     conn.onmessage = function (e) {
         var data = JSON.parse(e.data);
         console.log(data);
-        var key = keys[data.note - KEY0];
-        key.set_status(data.state == 'on');
+        $.each(data, function(i, evt) {
+                var key = keys[evt.note - KEY0];
+                key.set_status(evt.state == 'on');
+            });
     };
 }
 

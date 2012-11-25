@@ -48,7 +48,7 @@ class WebSocketTestHandler(websocket.WebSocketHandler):
         self.midi.unsubscribe(self)
 
     def received(self, data):
-        self.write_message(data)
+        self.write_message(json.dumps(data))
 
 if __name__ == "__main__":
 
