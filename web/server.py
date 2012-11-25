@@ -42,7 +42,12 @@ class WebSocketTestHandler(websocket.WebSocketHandler):
         self.midi.subscribe(self)
 
     def on_message(self, message):
-        print 'received', message
+        data = json.loads(message)
+        func = {
+            'on': lambda o, note: o.note_on(note, velocity=100),
+            'off': lambda o, note: o.note_off(note)
+        }[data['status']]
+        func(self.midi.output, data['note'])
 
     def on_close(self):
         self.midi.unsubscribe(self)

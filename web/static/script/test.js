@@ -7,6 +7,7 @@ var WIDTH_W = 30;
 
 function Key(i) {
     this.i = i;
+    this.cb = function(status) {};
 
     this.white = function() {
         return (this.offset() % 1. == 0.);
@@ -51,9 +52,11 @@ function Key(i) {
         var key = this;
         this.svg.hover(function() {
                 key.set_status(true);
+                key.cb(true);
             },
             function() {
                 key.set_status(false);
+                key.cb(false);
             });
     }
 }
@@ -85,14 +88,15 @@ function init_keyboard() {
     var conn = new WebSocket('ws://localhost:8000/socket');
     conn.onopen = function () {
         console.log('opened');
+        $.each(keys, function(i, e) {
+                e.cb = function(status) {
+                    conn.send(JSON.stringify({status: status ? 'on' : 'off', note: this.key()}));
+                };
+            });
     };
-
-// Log errors
     conn.onerror = function (error) {
         console.log('WebSocket Error ' + error);
     };
-
-// Log messages from the server
     conn.onmessage = function (e) {
         var data = JSON.parse(e.data);
         console.log(data);
