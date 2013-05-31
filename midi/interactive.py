@@ -1,7 +1,10 @@
+import pygame
+from pygame.locals import *
 from pygame import midi
 import threading
 import time
 
+pygame.init()
 midi.init()
 
 class MIDIDevice(threading.Thread):
@@ -45,19 +48,40 @@ class MIDIDevice(threading.Thread):
         func(self.output)
 
     def get_events(self):
-        buf = self.input.read(1000)
-        return filter(None, (parse_event(e) for e in buf))
+        for ev in self.input.read(1000):
+            yield parse_midi_event(ev)
 
     def run(self):
         while self.up:
-            events = self.get_events()
+            events = filter(None, self.get_events())
             if events:
                 self.broadcast(events)
             time.sleep(0.01)
 
         self.destroy_hardware()
 
-def parse_event(raw):
+class MockDevice(MIDIDevice):
+    class OutputStub(object):
+        def __getattr__(self, name):
+            def method(*args, **kwargs):
+                print name, args, kwargs
+            return method
+
+    def __init__(self):
+        super(MockDevice, self).__init__(None)
+        self.output = self.OutputStub()
+
+    def init_hardware(self, interface_name):
+        scr = pygame.display.set_mode((80, 80))
+
+    def destroy_hardware(self):
+        pass
+
+    def get_events(self):
+        for ev in pygame.event.get():
+            yield parse_mock_event(ev)
+
+def parse_midi_event(raw):
     data, timecode = raw
     try:
         state = {
@@ -67,6 +91,25 @@ def parse_event(raw):
     except KeyError:
         return None
     note = data[1]
+    return {'state': state, 'note': note}
+
+keycodes = {}
+def parse_mock_event(raw):
+    try:
+        state = {
+            KEYDOWN: 'on',
+            KEYUP: 'off',
+        }[raw.type]
+    except KeyError:
+        return None
+
+    if raw.key not in keycodes and hasattr(raw, 'unicode'):
+        try:
+            keycodes[raw.key] = r'`1234567890-=qwertyuiop[]\asdfghjkl;\'zxcvbnm,./'.index(raw.unicode) + 21
+        except ValueError:
+            keycodes[raw.key] = None
+    note = keycodes[raw.key]
+
     return {'state': state, 'note': note}
 
 def get_devices(name):
