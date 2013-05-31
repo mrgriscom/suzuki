@@ -5,8 +5,14 @@ var KEY0 = 21; // A
 var FREQ0 = 440. / Math.pow(2., 4.); // 4 octaves below A440
 var WIDTH_W = 30;
 
-function Key(i) {
+function clock() {
+    return new Date().getTime() / 1000.;
+}
+
+function PianoKey(i) {
     this.i = i;
+    this.status = false;
+    this.last_on = null;
     this.cb = function(status) {};
 
     this.white = function() {
@@ -42,6 +48,10 @@ function Key(i) {
     }
 
     this.set_status = function(active) {
+        this.status = active;
+        if (active) {
+            this.last_on = clock();
+        }
         this.svg.attr({fill: active ? 'orange' : this.default_color()});
     }
 
@@ -62,78 +72,133 @@ function Key(i) {
 }
 
 function init_keyboard() {
-    var paper = Raphael($('#canvas')[0]);
-
-    var WIDTH_W = 30;
-    var WIDTH_B = 15;
-
-    var scale_offset = [0, 0.5, 1, 1.5, 2, 3, 3.5, 4, 4.5, 5, 5.5, 6];
-    var scale_len = Math.ceil(scale_offset[scale_offset.length - 1] + .5);
-
-    var keys = [];
-    for (var i = 0; i < 88; i++) {
-        keys.push(new Key(i));
-    }
-    $.each([true, false], function(i, mode) {
-            // draw white keys first, then black
-            $.each(keys, function(i, e) {
-                    console.log(e, mode);
-                    if (e.white() == mode) {
-                        e.init_svg(paper);
-                    }
-                });
+    $('#canvas').svg({onLoad:
+            function(ctx) {
+                //var trainer = new TrainingSession(ctx);
+                //trainer.start();
+                init_pianoroll(ctx);
+            }
         });
-
-
-    var conn = new WebSocket('ws://localhost:8000/socket');
-    conn.onopen = function () {
-        console.log('opened');
-        $.each(keys, function(i, e) {
-                e.cb = function(status) {
-                    conn.send(JSON.stringify({status: status ? 'on' : 'off', note: this.key()}));
-                };
-            });
-    };
-    conn.onerror = function (error) {
-        console.log('WebSocket Error ' + error);
-    };
-    conn.onmessage = function (e) {
-        var data = JSON.parse(e.data);
-        console.log(data);
-        $.each(data, function(i, evt) {
-                var key = keys[evt.note - KEY0];
-                key.set_status(evt.state == 'on');
-            });
-    };
 }
 
-function init_pianoroll() {
-    var paper = Raphael($('#canvas')[0]);
-
-    var MODE = 'horiz';
-    //var MODE = 'vert';
+function init_pianoroll(ctx) {
+    //var MODE = 'horiz';
+    var MODE = 'vert';
 
     $.get('/pianoroll', function(data) {
+            var g = ctx.group({fill: '#ccf', stroke: 'black'});
+
             $.each(data, function(k, v) {
                     $.each(v, function(i, e) {
                             var r;
                             if (MODE == 'horiz') {
                                 var NOTE_SZ = 5;
                                 var BEAT_SZ = 25;
-                                r = paper.rect(e.beat * BEAT_SZ, (127 - e.note) * NOTE_SZ, e.duration * BEAT_SZ, NOTE_SZ);
+                                r = ctx.rect(g, e.beat * BEAT_SZ, (127 - e.note) * NOTE_SZ, e.duration * BEAT_SZ, NOTE_SZ);
                             } else {
-                                var BEAT_SZ = 200;
+                                var BEAT_SZ = 100; //200;
                                 var y = function(b) {
-                                    return 950 - BEAT_SZ * (Math.log(b + 1) - Math.log(1.));
+                                    return 950 - BEAT_SZ * b; // * (Math.log(b + 1) - Math.log(1.));
                                 }
 
                                 var NOTE_SZ = 1500 / 88.;
-                                r = paper.rect((e.note - 9) * NOTE_SZ, y(e.beat + e.duration), NOTE_SZ, y(e.beat) - y(e.beat + e.duration));
+
+                                /*
+                                if (e.beat > 50) {
+                                    return;
+                                }
+                                */
+
+                                r = ctx.rect(g, (e.note - 9) * NOTE_SZ, y(e.beat + e.duration), NOTE_SZ, y(e.beat) - y(e.beat + e.duration));
                             }
-                            r.attr({fill: '#ccf'});
                         });
                 });
+
+            var blah = function(clock) {
+                $(g).attr('transform', 'translate(0, ' + (60. * clock * .001) + ')');
+                requestAnimationFrame(blah);
+            };
+            requestAnimationFrame(blah);
         });
+
 }
 
+function init_trainer() {
 
+}
+
+function Keyboard(canvas) {
+    var kbd = this;
+
+    this.ctx = canvas;
+
+    this.init = function() {
+        this.keys = [];
+        for (var i = 0; i < 88; i++) {
+            this.keys.push(new PianoKey(i));
+        }
+        $.each([true, false], function(i, mode) {
+                // draw white keys first, then black
+                $.each(kbd.keys, function(i, e) {
+                        if (e.white() == mode) {
+                            e.init_svg(kbd.ctx);
+                        }
+                    });
+            });
+
+        this.conn = new WebSocket('ws://' + window.location.host + '/socket');
+        this.conn.onopen = function () {
+            $.each(kbd.keys, function(i, e) {
+                    e.cb = function(status) {
+                        kbd.conn.send(JSON.stringify({status: status ? 'on' : 'off', note: this.key()}));
+                    };
+                });
+        };
+        this.conn.onerror = function (error) {
+            console.log('websocket error ' + error);
+        };
+        this.conn.onmessage = function (e) {
+            var data = JSON.parse(e.data);
+            $.each(data, function(i, evt) {
+                    var key = kbd.keys[evt.note - KEY0];
+                    key.set_status(evt.state == 'on');
+                });
+        };
+    }
+
+    this.currently_pressed = function() {
+        var pressed = {};
+        $.each(this.keys, function(i, e) {
+                if (e.status) {
+                    pressed[e.i] = e.last_on;
+                }
+            });
+        return pressed;
+    }
+
+    this.init();
+}
+
+function PianoRoll() {
+
+}
+
+function TrainingSession(canvas) {
+    var trainer = this;
+
+    this.tempo = 120; // quarter notes per minute
+    this.clock = 0;
+    this.last_started = null;
+
+    this.keyboard = new Keyboard(canvas);
+    this.pianoroll = null;
+
+    this.tick = function() {
+        console.log(this.keyboard.currently_pressed());
+    }
+
+    this.start = function() {
+        var TICK = 1.; //0.01;
+        //setInterval(function() { trainer.tick(); }, 1000. * TICK);
+    }
+}

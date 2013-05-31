@@ -12,8 +12,8 @@ import tornado.websocket as websocket
 from optparse import OptionParser
 import logging
 import json
-from midi import fileformat
-from midi import interactive
+from midiutil import fileformat
+from midiutil import interactive
 
 def web_path(*args):
     return os.path.join(project_root, 'web', *args)
@@ -71,6 +71,7 @@ if __name__ == "__main__":
         device = interactive.MIDIDevice('RD MIDI 1')
     except IOError:
         device = interactive.MockDevice()
+        print 'using mock device'
     device.start()
 
     application = web.Application([
