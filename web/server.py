@@ -47,7 +47,7 @@ class WebSocketTestHandler(websocket.WebSocketHandler):
             'on': lambda o, note: o.note_on(note, velocity=100),
             'off': lambda o, note: o.note_off(note)
         }[data['status']]
-        func(self.midi.output, data['note'])
+        self.midi.do_action(lambda o: func(o, data['note']))
 
     def on_close(self):
         self.midi.unsubscribe(self)
@@ -67,7 +67,10 @@ if __name__ == "__main__":
         port = 8000
     ssl = None
 
-    device = interactive.MIDIDevice('RD MIDI 1')
+    try:
+        device = interactive.MIDIDevice('RD MIDI 1')
+    except IOError:
+        device = interactive.MockDevice()
     device.start()
 
     application = web.Application([
