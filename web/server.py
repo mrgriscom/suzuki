@@ -15,20 +15,28 @@ import json
 from midiutil import fileformat
 from midiutil import interactive
 
+MIDI_DIR = '/home/drew/midi'
+
 def web_path(*args):
     return os.path.join(project_root, 'web', *args)
 
+def load_midi(title):
+    # os.path.join is a security hole
+    return json.dumps(fileformat.load_midi(os.path.join(MIDI_DIR, '%s.mid' % title)))
+
 class PianoRollHandler(web.RequestHandler):
     def get(self):
-        midi_dir = '/home/drew/midi'
-        data = fileformat.load_midi(os.path.join(midi_dir, os.listdir(midi_dir)[0]))
-
         self.set_header('Content-Type', 'text/json')
-        self.write(json.dumps(data))
+        self.write(load_midi(self.get_argument('title')))
+
+class MIDIListHandler(web.RequestHandler):
+    def get(self):
+        midis = sorted([k[:-4] for k in os.listdir(MIDI_DIR) if k.endswith('.mid')])
+        self.render('midilist.html', midis=midis)
 
 class MainHandler(web.RequestHandler):
     def get(self):
-        self.render('test.html', onload='init_keyboard')
+        self.render('test.html', onload='init_keyboard', midi=load_midi(self.get_argument('title')))
 
 class PianoRollPlaygroundHandler(web.RequestHandler):
     def get(self):
@@ -75,7 +83,8 @@ if __name__ == "__main__":
     device.start()
 
     application = web.Application([
-        (r'/', MainHandler),
+        (r'/', MIDIListHandler),
+        (r'/train', MainHandler),
         (r'/pr', PianoRollPlaygroundHandler),
         (r'/pianoroll', PianoRollHandler),
         (r'/socket', WebSocketTestHandler, {'midi': device}),

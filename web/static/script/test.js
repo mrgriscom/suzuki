@@ -99,12 +99,9 @@ function PianoKey(i, get_beat) {
 }
 
 function init_keyboard() {
-    $('#canvas').svg({onLoad:
-            function(ctx) {
-                $.get('/pianoroll', function(data) {
-                        var trainer = new TrainingSession(ctx, data);
-                        trainer.start();
-                    });
+    $('#canvas').svg({onLoad: function(ctx) {
+                var trainer = new TrainingSession(ctx, DATA);
+                trainer.start();
             }
         });
 }
@@ -187,7 +184,7 @@ function PianoRoll(ctx, frame, data) {
 
         $.each(data, function(k, v) {
                 $.each(v, function(i, e) {
-                        var white = new PianoKey(e.note - KEY0).white();
+                        var white = new PianoKey(e.note - KEY0).white(); // FIXME making redundant PianoKey objects slows initial load
                         var BLACK_MARGIN = 0.2;
                         var r = ctx.rect(pr.pane, e.note - KEY0 + (white ? 0. : BLACK_MARGIN), BEAT_SZ * e.beat, 1. - (white ? 0. : 2*BLACK_MARGIN), BEAT_SZ * e.duration, {
                                 fill: (white ? '#ccf' : '#88b'),
@@ -202,6 +199,7 @@ function PianoRoll(ctx, frame, data) {
     }
 
     this.expected = function(t) {
+        // FIXME grossly inefficient
         var exp = {};
         $.each(data, function(k, v) {
                 $.each(v, function(i, e) {
