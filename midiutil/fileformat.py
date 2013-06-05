@@ -12,25 +12,45 @@ def load_midi(path):
     def relevant_event(evt):
         return isinstance(evt, (midi.NoteOnEvent, midi.NoteOffEvent))
 
-    def parse_event(evt):
+    def parse_event(evt, track_id):
         beat = evt.tick / float(m.resolution)
         note, velocity = evt.data
         if isinstance(evt, midi.NoteOffEvent) or velocity == 0:
             state = 'off'
         else:
             state = 'on'
-        return {'beat': beat, 'state': state, 'note': note}
+        return {'beat': beat, 'state': state, 'note': note, 'track': track_id}
 
-    events = [parse_event(evt) for evt in itertools.chain(*m) if relevant_event(evt)]
-    events_by_note = map_reduce(events, lambda e: [(e['note'], e)], lambda v: sorted(v, key=lambda e: e['beat']))
-    return dict((note, list(note_stream(events))) for note, events in events_by_note.iteritems())
+    def parse_track(track, track_id):
+        return [parse_event(evt, track_id) for evt in track if relevant_event(evt)]
+
+    def sort_track(notes):
+        return sorted(list(notes), key=lambda n: (n['beat'], n['note']))
+
+    events = itertools.chain(*(parse_track(track, i) for i, track in enumerate(m)))
+    events_by_note = map_reduce(events, lambda e: [(e['note'], e)], lambda v: sorted(v, key=lambda e: (e['beat'], e['track'])))
+    notes = sort_track(itertools.chain(*(note_stream(events) for note, events in events_by_note.iteritems())))
+
+    # identify left/right hands
+    track_ids = set(n['track'] for n in notes)
+    voices = dict((t, i) for i, t in enumerate(sorted(track_ids)))
+    if len(track_ids) == 2:
+        def avg(arr):
+            return sum(arr) / float(len(arr))
+        avg_notes = map_reduce(notes, lambda e: [(e['track'], e['note'])], avg)
+        voices = dict(zip(sorted(track_ids, key=lambda e: avg_notes[e]), ('left', 'right')))
+    for n in notes:
+        n['voice'] = voices.get(n['track'], n['track'])
+        del n['track']
+
+    return notes
 
 def note_stream(events_by_note):
     def _note_stream():
         start = [None] # workaround so var can be modified inside closure
 
         def emit(evt):
-            e = {'beat': start[0], 'note': evt['note'], 'duration': evt['beat'] - start[0]}
+            e = {'beat': start[0], 'note': evt['note'], 'duration': evt['beat'] - start[0], 'track': evt['track']}
             start[0] = None
             if e['duration'] == 0:
                 warn('warning: zero-length note')

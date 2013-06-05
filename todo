@@ -1,3 +1,8 @@
 left/right hands
 play-along
 more efficient expected note computation
+
+piano roll should line up w/ keyboard exactly
+skipping very short notes
+need to see if note is a re-press or not (show a bit of history)
+FINGERING!!

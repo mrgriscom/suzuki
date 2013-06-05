@@ -100,7 +100,7 @@ function PianoKey(i, get_beat) {
 
 function init_keyboard() {
     $('#canvas').svg({onLoad: function(ctx) {
-                var trainer = new TrainingSession(ctx, DATA);
+                var trainer = new TrainingSession(ctx, DATA, null);
                 trainer.start();
             }
         });
@@ -171,7 +171,7 @@ function Keyboard(ctx, frame, get_beat) {
     this.init();
 }
 
-function PianoRoll(ctx, frame, data) {
+function PianoRoll(ctx, frame, data, trainer) {
     var pr = this;
 
     this.init = function() {
@@ -182,15 +182,19 @@ function PianoRoll(ctx, frame, data) {
             });
         this.pane = ctx.group(g);
 
-        $.each(data, function(k, v) {
-                $.each(v, function(i, e) {
-                        var white = new PianoKey(e.note - KEY0).white(); // FIXME making redundant PianoKey objects slows initial load
-                        var BLACK_MARGIN = 0.2;
-                        var r = ctx.rect(pr.pane, e.note - KEY0 + (white ? 0. : BLACK_MARGIN), BEAT_SZ * e.beat, 1. - (white ? 0. : 2*BLACK_MARGIN), BEAT_SZ * e.duration, {
-                                fill: (white ? '#ccf' : '#88b'),
-                                //fill: (white ? '#fcf' : '#b8b'),
-                            });
-                    });
+        $.each(data, function(i, e) {
+                var BLACK_MARGIN = 0.2;
+
+                var white = new PianoKey(e.note - KEY0).white(); // FIXME making redundant PianoKey objects slows initial load
+                var color;
+                if (!trainer.voice_active(e.voice)) {
+                    color = (white ? '#aaa' : '#aaa');
+                } else if (e.voice == 'left') {
+                    color = (white ? '#fcf' : '#b8b');
+                } else {
+                    color = (white ? '#ccf' : '#88b');
+                }
+                var r = ctx.rect(pr.pane, e.note - KEY0 + (white ? 0. : BLACK_MARGIN), BEAT_SZ * e.beat, 1. - (white ? 0. : 2*BLACK_MARGIN), BEAT_SZ * e.duration, {fill: color});
             });
     }
 
@@ -201,12 +205,10 @@ function PianoRoll(ctx, frame, data) {
     this.expected = function(t) {
         // FIXME grossly inefficient
         var exp = {};
-        $.each(data, function(k, v) {
-                $.each(v, function(i, e) {
-                        if (e.beat <= t && t < e.beat + e.duration) {
-                            exp[e.note] = e.beat;
-                        }
-                    });
+        $.each(data, function(i, e) {
+                if (trainer.voice_active(e.voice) && e.beat <= t && t < e.beat + e.duration) {
+                    exp[e.note] = e.beat;
+                }
             });
         return exp;
     }
@@ -214,10 +216,11 @@ function PianoRoll(ctx, frame, data) {
     this.init();
 }
 
-function TrainingSession(ctx, data) {
+function TrainingSession(ctx, data, voices) {
     var trainer = this;
 
-    this.tempo = 40; // quarter notes per minute
+    this.voices = voices;
+    this.tempo = 120; // quarter notes per minute
     this.cur_beat = 0.;
     this.cur_clock = 0.;
 
@@ -226,8 +229,12 @@ function TrainingSession(ctx, data) {
         var h = $('#canvas').height();
         var g = ctx.group({transform: 'scale(' + w + ',' + -w + ') translate(0,' + (-h/w) + ')'});
 
-        this.pianoroll = new PianoRoll(ctx, g, data);
+        this.pianoroll = new PianoRoll(ctx, g, data, this);
         this.keyboard = new Keyboard(ctx, g, function() { return trainer.cur_beat; });
+    }
+
+    this.voice_active = function(v) {
+        return (this.voices == null || this.voices.indexOf(v) != -1);
     }
 
     this.tick = function(t) {
